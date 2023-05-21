@@ -1,35 +1,5 @@
 const mongoose = require('mongoose');
-
-const thoughtSchema = new mongoose.Schema({
-  thoughtText: {
-    type: String,
-    required: true,
-    // Must be between 1 and 280 characters
-    minlength: 1,
-    maxlength: 280
-  },
-  createdAt: {
-    // Set default value to the current timestamp
-    type: Date,
-    default: Date.now
-  },
-  username: {
-    type: String,
-    ref: 'Thought'
-  },
-  reactions: [
-    // Array of nested documents created with the `reactionSchema`
-    reactionSchema
-  ]
-},
-{
-  toJSON: {
-    virtuals: true,
-    getters: true,
-  },
-  id: false,
-});
-
+// Array of nested documents created with the `reactionSchema`
 const reactionSchema = new mongoose.Schema({
   reactionId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -59,6 +29,35 @@ const reactionSchema = new mongoose.Schema({
     id: false,
   }
 );
+const thoughtSchema = new mongoose.Schema({
+  thoughtText: {
+    type: String,
+    required: true,
+    // Must be between 1 and 280 characters
+    minlength: 1,
+    maxlength: 280
+  },
+  createdAt: {
+    // Set default value to the current timestamp
+    type: Date,
+    default: Date.now
+  },
+  username: {
+    type: String,
+    ref: 'Thought'
+  },
+  reactions: [
+    // Array of nested documents created with the `reactionSchema`
+    reactionSchema
+  ]
+},
+{
+  toJSON: {
+    virtuals: true,
+    getters: true,
+  },
+  id: false,
+});
 
 // Create a virtual called `reactionCount` that retrieves the length of the thought's `reactions` array field on query.
 thoughtSchema.virtual('reactionCount').get(function () {

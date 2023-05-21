@@ -1,82 +1,145 @@
-const router = require('express').Router();
-const { Project, User } = require('../models');
-const withAuth = require('../Main/utils/auth');
+const { Users, Thought } = require('../models');
 
-router.get('/', async (req, res) => {
-  try {
-    // Get all projects and JOIN with user data
-    const projectData = await Project.findAll({
-      include: [
-        {
-          model: User,
-          attributes: ['name'],
-        },
-      ],
-    });
+const thoughtController = {
 
-    // Serialize data so the template can read it
-    const projects = projectData.map((project) => project.get({ plain: true }));
+    getAllThoughts(req, res) {
+        Thought.find({})
+            .populate({
+                path: 'reactions',
+                select: '-__v'
+            })
+            .select('-__v')
+            .sort({ _id: -1 })
+            .then(thoughtData => res.json(thoughtData))
+            .catch(err => {
+                console.log(err);
+                res.sendStatus(400);
+            });
+    },
 
-    // Pass serialized data and session flag into template
-    res.render('homepage', { 
-      projects, 
-      logged_in: req.session.logged_in 
-    });
-  } catch (err) {
-    res.status(500).json(err);
-  }
-});
+    getThoughtById({ params }, res) {
+        Thought.findOne({ _id: params.id })
+            .populate({
+                path: 'reactions',
+                select: '-__v'
+            })
+            .select('-__v')
+            .sort({ _id: -1 })
+            .then(thoughtData => {
+                if (!thoughtData) {
+                    return res.status(404).json({ message: 'No thoughts found!' });
+                }
 
-router.get('/project/:id', async (req, res) => {
-  try {
-    const projectData = await Project.findByPk(req.params.id, {
-      include: [
-        {
-          model: User,
-          attributes: ['name'],
-        },
-      ],
-    });
+                res.json(thoughtData);
 
-    const project = projectData.get({ plain: true });
+            })
+            .catch(err => {
+                console.log(err);
+                res.sendStatus(400);
+            });
+    },
 
-    res.render('project', {
-      ...project,
-      logged_in: req.session.logged_in
-    });
-  } catch (err) {
-    res.status(500).json(err);
-  }
-});
+    createThought({ body }, res) {
+        Thought.create(body)
+            .then(({ _id }) => {
+                return Users.findOneAndUpdate(
+                    { _id: body.userId },
+                    { $push: { thought: _id } },
+                    { new: true }
+                );
+            })
+            .then(thoughtData => {
+                if (!thoughtData) {
+                    return res.status(404).json({ message: 'User not found!' });
+                }
 
-// Use withAuth middleware to prevent access to route
-router.get('/profile', withAuth, async (req, res) => {
-  try {
-    // Find the logged in user based on the session ID
-    const userData = await User.findByPk(req.session.user_id, {
-      attributes: { exclude: ['password'] },
-      include: [{ model: Project }],
-    });
+                res.json(thoughtData);
 
-    const user = userData.get({ plain: true });
+            })
+            .catch(err => {
+                console.log(err);
+                res.sendStatus(400);
+            })
+    },
 
-    res.render('profile', {
-      ...user,
-      logged_in: true
-    });
-  } catch (err) {
-    res.status(500).json(err);
-  }
-});
+    updateThought({ params, body }, res) {
+        Thought.findOneAndUpdate(
+            { _id: params.id },
+            body,
+            { new: true, runValidators: true })
+            .then(thoughtData => {
+                if (!thoughtData) {
+                    return res.status(404).json({ message: 'No thoughts found!' });
+                }
 
-router.get('/login', (req, res) => {
-  // If the user is already logged in, redirect the request to another route
-  if (req.session.logged_in) {
-    res.redirect('/profile');
-    return;
-  }
+                res.json(thoughtData);
 
-  res.render('login');
-});
+            })
+            .catch(err => {
+                console.log(err);
+                res.sendStatus(400);
+            })
+    },
 
-module.exports = router;
+    deleteThought({ params }, res) {
+        Thought.findOneAndDelete({ _id: params.id })
+            .then(thoughtData => {
+                if (!thoughtData) {
+                    return res.status(404).json({ message: 'No thoughts found!' });
+                }
+                return Users.findOneAndUpdate(
+                    { _id: params.userId },
+                    { $pull: { thought: params.Id } },
+                    { new: true }
+                )
+                
+            })
+
+            .catch(err => {
+                console.log(err);
+                res.sendStatus(400);
+            })
+    },
+
+    createReaction({ params, body }, res) {
+        Thought.findOneAndUpdate(
+            { _id: params.thoughtId },
+            { $push: { reactions: body } },
+            { new: true, runValidators: true })
+            .populate({ path: 'reactions', select: '-__v' })
+            .select('-__v')
+            .then(thoughtData => {
+                if (!thoughtData) {
+                    return res.status(404).json({ message: 'No thoughts found!' });
+                }
+
+                res.json(thoughtData);
+            })
+            .catch(err => {
+                console.log(err);
+                res.sendStatus(400);
+            })
+    },
+
+    deleteReaction({ params }, res) {
+        Thought.findOneAndUpdate(
+            { _id: params.thoughtId },
+            { $pull: { reactions: { reactionId: params.reactionId } } },
+            { new: true })
+            .then(thoughtData => {
+                if (!thoughtData) {
+                    return res.status(404).json({ message: 'No thoughts found!' });
+                }
+
+                res.json(thoughtData);
+            })
+            .catch(err => {
+                console.log(err);
+                res.sendStatus(400);
+            })
+    }
+
+};
+
+
+module.exports = thoughtController
